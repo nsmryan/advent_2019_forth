@@ -1,24 +1,29 @@
 include test.fs
 
 struct
-  cell% field stack-depth 
-  cell% field stack-max-depth 
-  cell% field stack-data
-end-struct stack
+  cell% field >stack-depth 
+  cell% field >stack-max-depth 
+  cell% field >stack-data
+end-struct stack%
 
-: deep        here >r dup >r 1 - cells + %allot r> r> stack-max-depth ! ;
-( create *stack name* stack 10 deep )
+: deep        cells + ;
+: stack-init  ( stack depth -- )
+              2dup  cells stack% nip cells + 0 fill
+              swap  >stack-max-depth ! ;
 
 
-: check-incr dup stack-depth @ swap 1 + stack-max-depth = if 100 throw then ;
-: check-decr dup stack-depth @ 0= if 100 throw then ;
+: check-push dup assert( dup >stack-depth @ 1 + swap >stack-max-depth <= ) ;
+: check-pop  dup assert( >stack-depth @ 0 > ) ;
 
-: stack-incr stack-depth dup @ 1 + swap ! ;
-: stack-decr stack-depth dup @ 1 - swap ! ;
+: stack-incr >stack-depth dup @ 1 + swap ! ;
+: stack-decr >stack-depth dup @ 1 - swap ! ;
 
-( n stack -- )
-: push-stack  tuck check-incr  over dup stack-depth cells swap stack-data + ! stack-incr ;
+: stack-cell ( stack -- *cell )
+             dup >stack-depth cells swap >stack-data + ;
 
-( stack -- n )
-: push-stack  dup check-decr  dup stack-decr dup stack-depth cells swap stack-data + @ ;
+: push-stack  ( n stack -- ) check-push
+              tuck stack-cell !  stack-incr ;
+
+: pop-stack  ( stack -- n ) check-pop
+             dup stack-decr stack-cell @ ;
 
