@@ -13,7 +13,7 @@ s" input_day2.txt" 2constant input-file-name
 
 ( part 1 )
 : .result           0 load . ;
-: setup             input-file-name ingest input @ #input @ start-intcode ;
+: setup             input-file-name ingest text @ #text @ start-intcode ;
 
 : part-1            setup 12 2 poke  run  .result ;
 
