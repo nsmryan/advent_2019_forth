@@ -1,4 +1,4 @@
-include test.fs
+include utils.fs
 
 struct
   cell% field >stack-depth 
@@ -6,24 +6,44 @@ struct
   cell% field >stack-data
 end-struct stack%
 
-: deep        cells + ;
-: stack-init  ( stack depth -- )
-              2dup  cells stack% nip cells + 0 fill
-              swap  >stack-max-depth ! ;
+variable stack
+: stack-depth     stack @ >stack-depth ;
+: stack-max-depth stack @ >stack-max-depth ;
+: stack-data      stack @ >stack-data ;
+
+: deep            cells + ;
+: stack-init      ( stack depth -- )
+                  2dup  cells stack% nip cells + 0 fill
+                  swap  >stack-max-depth ! ;
 
 
-: check-push dup assert( dup >stack-depth @ 1 + swap >stack-max-depth <= ) ;
-: check-pop  dup assert( >stack-depth @ 0 > ) ;
+: pop-stack?      stack-depth @ 0 > ;
+: push-stack?     stack-depth @ 1 + stack-max-depth @ <= ;
 
-: stack-incr >stack-depth dup @ 1 + swap ! ;
-: stack-decr >stack-depth dup @ 1 - swap ! ;
+: check-push      assert( push-stack? ) ;
+: check-pop       assert( pop-stack? ) ;
 
-: stack-cell ( stack -- *cell )
-             dup >stack-depth cells swap >stack-data + ;
+: stack-incr      stack-depth 1+! ;
+: stack-decr      stack-depth 1-! ;
 
-: push-stack  ( n stack -- ) check-push
-              tuck stack-cell !  stack-incr ;
+: stack-cell      ( stack -- *cell )
+                  stack-depth @ cells stack-data + ;
 
-: pop-stack  ( stack -- n ) check-pop
-             dup stack-decr stack-cell @ ;
+: push-stack      ( n stack -- ) check-push
+                  stack-cell !  stack-incr ;
+
+: pop-stack       ( stack -- n ) check-pop
+                  stack-decr stack-cell @ ;
+
+: .stack          stack-depth @ 0 ?do memory i cells + @ . space loop ;
+
+: stack-test      stack% 3 deep %allot stack ! stack @ 3 stack-init
+                  assert( 3 stack-max-depth @ = )
+                  assert( 0 stack-depth @ = )
+                  1 push-stack
+                  2 push-stack
+                  3 push-stack
+                  assert( pop-stack 3 = ) 
+                  assert( pop-stack 2 = ) 
+                  assert( pop-stack 1 = ) ;
 

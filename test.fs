@@ -1,7 +1,8 @@
+include utils.fs
+
 2variable test-name
 variable failures
 
-: 1+!        dup @ 1 + swap ! ;
 : report     ." failed in test '" test-name 2@ type ." ' expected: " . ." was: " . ;
 
 : assert-eq  2dup <> if failures 1+! cr ." assert-eq "  report else ." ." then ;

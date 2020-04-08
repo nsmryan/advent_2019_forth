@@ -29,5 +29,5 @@ variable verb
 : next-pair         0  noun 1+! noun @ 99 > if 0 noun ! 1 + then verb @ + verb ! ;
 : .pair             pair swap . . ;
 : .result           pair swap 100 * + . ;
-: part-2            setup begin not-done while restore  pair poke run next-pair repeat .result ;
+: part-2            setup begin not-done while intcode @ restore  pair poke run next-pair repeat .result ;
 
