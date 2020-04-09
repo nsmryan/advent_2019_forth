@@ -35,7 +35,15 @@ variable stack
 : pop-stack       ( stack -- n ) check-pop
                   stack-decr stack-cell @ ;
 
-: .stack          stack-depth @ 0 ?do memory i cells + @ . space loop ;
+: clear-stack     0 stack-depth ! ;
+: index-stack     cells stack-data + ;
+: revdex-stack    cells stack-depth @ 1- swap - cells stack-data + ;
+: pair@           dup index-stack @ swap revdex-stack @ ;
+: pair!           tuck index-stack ! revdex-stack ! ;
+: rev-stack       stack-depth @ 2 / 0 ?do i pair@ i pair! loop ;
+
+: .stack-info     ." depth: " stack-depth @ . ." , max: " stack-max-depth @ . ;
+: .stack          cr .stack-info cr stack-depth @ 0 ?do i index-stack @ . space loop ;
 
 : stack-test      stack% 3 deep %allot stack ! stack @ 3 stack-init
                   assert( 3 stack-max-depth @ = )
@@ -43,7 +51,8 @@ variable stack
                   1 push-stack
                   2 push-stack
                   3 push-stack
-                  assert( pop-stack 3 = ) 
+                  rev-stack
+                  assert( pop-stack 1 = ) 
                   assert( pop-stack 2 = ) 
-                  assert( pop-stack 1 = ) ;
+                  assert( pop-stack 3 = ) ;
 
