@@ -21,6 +21,10 @@ include stack.fs
 2 constant MULT-CODE
 3 constant IN-CODE
 4 constant OUT-CODE
+5 constant JEQ-CODE
+6 constant JNEQ-CODE
+7 constant LT-CODE
+8 constant EQ-CODE
 99 constant END-CODE
 
 : memory%       1 #memory cells ;
@@ -120,12 +124,20 @@ variable cursor
 : op-mult         arg arg * dst! ;
 : op-input        in-stack stack ! pop-stack dst! ;
 : op-output       arg out-stack stack ! push-stack ;
+: op-jeq          arg if arg ip ! else ip++ then ;
+: op-jneq         arg 0 = if arg ip ! else ip++ then ;
+: op-lt           arg arg < if 1 else 0 then dst! ;
+: op-eq           arg arg = if 1 else 0 then dst! ;
 
 : exec            case
                     ADD-CODE  of op-add    endof
                     MULT-CODE of op-mult   endof
                     IN-CODE   of op-input  endof
                     OUT-CODE  of op-output endof
+                    JEQ-CODE  of op-jeq    endof
+                    JNEQ-CODE of op-jneq   endof
+                    LT-CODE   of op-lt     endof
+                    EQ-CODE   of op-eq     endof
                     dup ." unexpected opcode! " . ." at: " .current-cell cr
                   endcase ;
 
@@ -141,8 +153,16 @@ variable cursor
                     ip @ cells-used ! ;
 : ,mult             MULT-CODE ip!++ arg-order ip!++ ip!++ ip!++ 
                     ip @ cells-used ! ;
+: ,in               IN-CODE ip!++ ip!++
+                    ip @ cells-used ! ;
+: ,out              OUT-CODE ip!++ ip!++
+                    ip @ cells-used ! ;
 : ,end              END-CODE ip!++
                     ip @ cells-used ! ;
+: ,jeq              JEQ-CODE ip!++ swap ip!++ ip!++ ;
+: ,jneq             JNEQ-CODE ip!++ swap ip!++ ip!++ ;
+: ,lt               LT-CODE ip!++ arg-order ip!++ ip!++ ip!++ ;
+: ,eq               EQ-CODE ip!++ arg-order ip!++ ip!++ ip!++ ;
 : end-asm           0 ip ! ;
 
 ( intcode disassembler )
@@ -155,6 +175,10 @@ variable offset
 : dis-mult          ." mult " offset++ .arg .arg .arg cr ;
 : dis-input         ." in " offset++ .arg cr ;
 : dis-output        ." out " offset++ .arg cr ;
+: dis-jeq           ." jeq " offset++ .arg .arg cr ;
+: dis-jneq          ." jneq " offset++ .arg .arg cr ;
+: dis-lt            ." lt " offset++ .arg .arg .arg cr ;
+: dis-eq            ." eq " offset++ .arg .arg .arg cr ;
 : dis-exit          ." .exit " cr offset++ ;
 
 : disop             offset@ case
@@ -162,6 +186,10 @@ variable offset
                       MULT-CODE of dis-mult   endof
                       IN-CODE   of dis-input  endof
                       OUT-CODE  of dis-output endof
+                      JEQ-CODE  of dis-jeq    endof
+                      JNEQ-CODE of dis-jneq   endof
+                      LT-CODE   of dis-lt     endof
+                      EQ-CODE   of dis-eq     endof
                       END-CODE  of dis-exit   endof
                       dup cr ." unexpected opcode! " . ." at: " .current-cell cr
                     endcase ;

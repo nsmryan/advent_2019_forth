@@ -8,3 +8,8 @@ variable #text
 : open-input       r/o open-file throw text-fd ! ;
 : ingest           open-input allocate-file read-input-file ;
 
+
+( reload solutuion )
+2variable solution-file-name
+: re                solution-file-name 2@ included ;
+
