@@ -6,13 +6,12 @@ s" day5.fs" solution-file-name 2!
 s" input_day5.txt" 2constant input-file-name
 
 ( utilities )
-: .result           .output ;
+: .result           begin intcode-out dup 0= while repeat . ;
 : setup             input-file-name ingest text @ #text @ start-intcode ;
-: push-id           in-ring >>ring ring-push ;
 
 ( part 1 )
-: part-1            setup 1 push-id run .result ;
+: part-1            setup 1 intcode-in run .result ;
 
 ( part 2)
-: part-2            setup 5 push-id run .result ;
+: part-2            setup 5 intcode-in run .result ;
 

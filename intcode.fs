@@ -79,6 +79,9 @@ here original ! intcode% %allot intcode-init
 : ip@++           ip@ ip++ ;
 : ip--            ip 1-! ;
 
+: intcode-in      in-ring >>ring ring-push ;
+: intcode-out     out-ring >>ring ring-pop ;
+
 : .ip             ." ip: " ip @ . ." = " ip@ . cr ;
 : .memory         0 begin dup cells-used @ 32 min < while dup load . 1+ repeat drop ;
 : .cells-used     ." cells: " cells-used @ . ;
