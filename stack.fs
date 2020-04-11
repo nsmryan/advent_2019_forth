@@ -7,21 +7,24 @@ struct
 end-struct stack%
 
 variable stack
+: >>stack         stack ! ;
 : stack-depth     stack @ >stack-depth ;
 : stack-max-depth stack @ >stack-max-depth ;
 : stack-data      stack @ >stack-data ;
 
 : deep            cells + ;
-: stack-init      ( stack depth -- )
-                  2dup  cells stack% nip cells + 0 fill
-                  swap  >stack-max-depth ! ;
+: stack-init      ( depth -- )
+                  dup cells stack% nip + stack @ swap 0 fill
+                  stack-max-depth ! ;
+
+: stack-new       dup stack% rot deep %allot >>stack stack-init ;
 
 
-: pop-stack?      stack-depth @ 0 > ;
-: push-stack?     stack-depth @ 1 + stack-max-depth @ <= ;
+: stack-pop?      stack-depth @ 0 > ;
+: stack-push?     stack-depth @ 1 + stack-max-depth @ <= ;
 
-: check-push      assert( push-stack? ) ;
-: check-pop       assert( pop-stack? ) ;
+: assert-push     assert( stack-push? ) ;
+: assert-pop      assert( stack-pop? ) ;
 
 : stack-incr      stack-depth 1+! ;
 : stack-decr      stack-depth 1-! ;
@@ -29,10 +32,10 @@ variable stack
 : stack-cell      ( stack -- *cell )
                   stack-depth @ cells stack-data + ;
 
-: push-stack      ( n stack -- ) check-push
+: stack-push      ( n stack -- ) assert-push
                   stack-cell !  stack-incr ;
 
-: pop-stack       ( stack -- n ) check-pop
+: stack-pop       ( stack -- n ) assert-pop
                   stack-decr stack-cell @ ;
 
 : clear-stack     0 stack-depth ! ;
@@ -45,14 +48,15 @@ variable stack
 : .stack-info     ." depth: " stack-depth @ . ." , max: " stack-max-depth @ . ;
 : .stack          cr .stack-info cr stack-depth @ 0 ?do i index-stack @ . space loop ;
 
-: stack-test      stack% 3 deep %allot stack ! stack @ 3 stack-init
+: stack-test      3 stack-new
                   assert( 3 stack-max-depth @ = )
                   assert( 0 stack-depth @ = )
-                  1 push-stack
-                  2 push-stack
-                  3 push-stack
+                  1 stack-push
+                  2 stack-push
+                  3 stack-push
                   rev-stack
-                  assert( pop-stack 1 = ) 
-                  assert( pop-stack 2 = ) 
-                  assert( pop-stack 3 = ) ;
+                  assert( stack-pop 1 = )
+                  assert( stack-pop 2 = )
+                  assert( stack-pop 3 = )
+                  cr ." stack tests passed!" cr ;
 

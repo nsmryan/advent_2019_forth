@@ -8,7 +8,7 @@ s" input_day5.txt" 2constant input-file-name
 ( utilities )
 : .result           .output ;
 : setup             input-file-name ingest text @ #text @ start-intcode ;
-: push-id           in-stack stack ! push-stack ;
+: push-id           in-ring >>ring ring-push ;
 
 ( part 1 )
 : part-1            setup 1 push-id run .result ;

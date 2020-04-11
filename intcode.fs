@@ -1,5 +1,5 @@
 include utils.fs
-include stack.fs
+include ring.fs
 
 
 ( intcode definition )
@@ -10,10 +10,10 @@ include stack.fs
 0 constant POS-MODE
 1 constant IMM-MODE
 
-( NOTE set state if no input, and check on loop )
 0 constant INT_RUNNING
 1 constant INT_DONE
 2 constant INT_NEED_INPUT
+3 constant INT_ERROR
 
 1 constant ADD-CODE
 2 constant MULT-CODE
@@ -26,9 +26,9 @@ include stack.fs
 99 constant END-CODE
 
 : memory%       1 #memory cells ;
-: in-stack%     stack% #input deep ;
-: out-stack%    stack% #output deep ;
-: mode-stack%   stack% #modes deep ;
+: in-ring%      ring% #input long ;
+: out-ring%     ring% #output long ;
+: mode-ring%    ring% #modes long ;
 
 struct
   cell% field >ip
@@ -36,32 +36,33 @@ struct
   cell% field >cells-used
   cell% field >instr
   cell% field >state
-  in-stack% field >in-stack
-  out-stack% field >out-stack
-  mode-stack% field >mode-stack
+  in-ring% field >in-ring
+  out-ring% field >out-ring
+  mode-ring% field >mode-ring
   memory% field >memory
 end-struct intcode%
 
 : #intcode          intcode% nip ;
 : intcode0          #intcode 0 fill ;
 : intcode-init      dup intcode0
-                    dup >in-stack  #input  stack-init
-                    dup >out-stack #output stack-init
-                        >mode-stack #modes stack-init ;
+                    dup >in-ring   >>ring #input  ring-init
+                    dup >out-ring  >>ring #output ring-init
+                        >mode-ring >>ring #modes  ring-init ;
 
 
 variable intcode
+: >>intcode         intcode ! ;
 : ip                intcode @ >ip ;
 : cycles            intcode @ >cycles ;
 : cells-used        intcode @ >cells-used ;
 : instr             intcode @ >instr ;
 : state             intcode @ >state ;
-: in-stack          intcode @ >in-stack ;
-: out-stack         intcode @ >out-stack ;
-: mode-stack        intcode @ >mode-stack ;
+: in-ring           intcode @ >in-ring ;
+: out-ring          intcode @ >out-ring ;
+: mode-ring         intcode @ >mode-ring ;
 : memory            intcode @ >memory ;
 
-: intcode-new       intcode% %allot dup intcode-init intcode ! ;
+: intcode-new       intcode% %allot dup intcode-init >>intcode ;
 
 variable original
 here original ! intcode% %allot intcode-init
@@ -81,12 +82,12 @@ here original ! intcode% %allot intcode-init
 : .ip             ." ip: " ip @ . ." = " ip@ . cr ;
 : .memory         0 begin dup cells-used @ 32 min < while dup load . 1+ repeat drop ;
 : .cells-used     ." cells: " cells-used @ . ;
-: .input          ." in stack:" cr in-stack stack ! .stack ;
-: .output         ." out stack:" cr out-stack stack ! .stack ;
+: .input          ." input:" cr in-ring >>ring .ring ;
+: .output         ." output:" cr out-ring >>ring .ring ;
 : .intcode        cr .ip cr .cells-used cr .memory cr .input cr .output ;
 
 : .current-cell   ip @ . ;
-: .output         out-stack stack ! .stack ;
+: .output         out-ring >>ring .ring ;
 
 ( parsing )
 variable program
@@ -102,31 +103,31 @@ variable cursor
 : code-length     -end 0 begin dup not-comma? while 1 + repeat ;
 : parse-program   begin code-length dup while read-code store-code repeat drop ;
 
-: init-intcode    intcode% %allot  intcode !  intcode @ restore ;
+: init-intcode    intcode% %allot  >>intcode  intcode @ restore ;
 : init-parser     #program ! program !  program @ cursor ! ;
 
-: start-intcode   init-parser  original @ intcode !  parse-program init-intcode ;
+: start-intcode   init-parser  original @ >>intcode  parse-program init-intcode ;
 
 ( instruction decoding )
-: push-mode       mode-stack stack ! push-stack ;
-: pop-mode        mode-stack stack ! pop-stack? if pop-stack else 0 then ;
+: push-mode       mode-ring >>ring ring-push ;
+: pop-mode        mode-ring >>ring ring-pop? if ring-pop else 0 then ;
 : split-mode      10 /mod swap ;
 : split-op        100 /mod swap ;
-: init-decode     mode-stack stack ! clear-stack ;
-: clean-decode    mode-stack stack ! rev-stack ;
+: init-decode     mode-ring >>ring ring-clear ;
 : decode          split-op instr ! begin dup 0 > while split-mode push-mode repeat drop ;
-: decode-instr    init-decode decode clean-decode ;
+: decode-instr    init-decode decode ;
 
 ( running )
 : running?        state @ INT_RUNNING = ;
 : need-input      INT_NEED_INPUT state ! ;
+: error-mode      INT_ERROR state ! ;
 
 : arg             ip@++  pop-mode POS-MODE = if load then ;
 : dst!            ip@++ store ;
 : op-add          arg arg + dst! ;
 : op-mult         arg arg * dst! ;
-: op-input        in-stack stack ! pop-stack? if pop-stack dst! else ip-- need-input then ;
-: op-output       arg out-stack stack ! push-stack ;
+: op-input        in-ring >>ring ring-pop? if ring-pop dst! else ip-- need-input then ;
+: op-output       arg out-ring >>ring ring-push ;
 : op-jeq          arg if arg ip ! else ip++ then ;
 : op-jneq         arg 0 = if arg ip ! else ip++ then ;
 : op-lt           arg arg < if 1 else 0 then dst! ;
@@ -143,7 +144,7 @@ variable cursor
                     LT-CODE   of op-lt     endof
                     EQ-CODE   of op-eq     endof
                     END-CODE  of op-end    endof
-                    dup ." unexpected opcode! " . ." at: " .current-cell cr
+                    dup ." unexpected opcode! " . ." at: " .current-cell cr error-mode
                   endcase ;
 
 : step            ip@++  decode-instr  instr @ exec  cycles 1+! ;
