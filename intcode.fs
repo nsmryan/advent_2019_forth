@@ -1,8 +1,6 @@
 include utils.fs
 include stack.fs
 
-( utilities )
-: .. dup . ;
 
 ( intcode definition )
 2048 constant #memory
@@ -37,13 +35,15 @@ struct
   cell% field >cycles
   cell% field >cells-used
   cell% field >instr
+  cell% field >state
   in-stack% field >in-stack
   out-stack% field >out-stack
   mode-stack% field >mode-stack
   memory% field >memory
 end-struct intcode%
 
-: intcode0          intcode% nip cells 0 fill ;
+: #intcode          intcode% nip ;
+: intcode0          #intcode 0 fill ;
 : intcode-init      dup intcode0
                     dup >in-stack  #input  stack-init
                     dup >out-stack #output stack-init
@@ -55,6 +55,7 @@ variable intcode
 : cycles            intcode @ >cycles ;
 : cells-used        intcode @ >cells-used ;
 : instr             intcode @ >instr ;
+: state             intcode @ >state ;
 : in-stack          intcode @ >in-stack ;
 : out-stack         intcode @ >out-stack ;
 : mode-stack        intcode @ >mode-stack ;
@@ -75,6 +76,7 @@ here original ! intcode% %allot intcode-init
 : ip++            ip 1+! ;
 : ip!++           ip! ip++ ;
 : ip@++           ip@ ip++ ;
+: ip--            ip 1-! ;
 
 : .ip             ." ip: " ip @ . ." = " ip@ . cr ;
 : .memory         0 begin dup cells-used @ 32 min < while dup load . 1+ repeat drop ;
@@ -116,18 +118,20 @@ variable cursor
 : decode-instr    init-decode decode clean-decode ;
 
 ( running )
-: not-done        ip@ END-CODE <> ;
+: running?        state @ INT_RUNNING = ;
+: need-input      INT_NEED_INPUT state ! ;
 
 : arg             ip@++  pop-mode POS-MODE = if load then ;
 : dst!            ip@++ store ;
 : op-add          arg arg + dst! ;
 : op-mult         arg arg * dst! ;
-: op-input        in-stack stack ! pop-stack dst! ;
+: op-input        in-stack stack ! pop-stack? if pop-stack dst! else ip-- need-input then ;
 : op-output       arg out-stack stack ! push-stack ;
 : op-jeq          arg if arg ip ! else ip++ then ;
 : op-jneq         arg 0 = if arg ip ! else ip++ then ;
 : op-lt           arg arg < if 1 else 0 then dst! ;
 : op-eq           arg arg = if 1 else 0 then dst! ;
+: op-end          INT_DONE state ! ;
 
 : exec            case
                     ADD-CODE  of op-add    endof
@@ -138,13 +142,13 @@ variable cursor
                     JNEQ-CODE of op-jneq   endof
                     LT-CODE   of op-lt     endof
                     EQ-CODE   of op-eq     endof
+                    END-CODE  of op-end    endof
                     dup ." unexpected opcode! " . ." at: " .current-cell cr
                   endcase ;
 
 : step            ip@++  decode-instr  instr @ exec  cycles 1+! ;
-: run             begin not-done while step repeat ;
+: run             begin running? while step repeat ;
 
-: poke            2 store  1 store ;
 
 ( intcode assembler )
 : asm               ;
@@ -193,6 +197,7 @@ variable offset
                       END-CODE  of dis-exit   endof
                       dup cr ." unexpected opcode! " . ." at: " .current-cell cr
                     endcase ;
+
 : disassemble       begin offset @ cells-used @ < while disop repeat ;
 : dis-header        cr ." intcode disassembly" cr ." cells used: " cells-used @ . cr ;
 : disasm            0 offset ! dis-header disassemble ;

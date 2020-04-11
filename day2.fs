@@ -11,9 +11,12 @@ s" input_day2.txt" 2constant input-file-name
 
 : reload solution-file-name included ;
 
+
 ( part 1 )
 : .result           0 load . ;
 : setup             input-file-name ingest text @ #text @ start-intcode ;
+
+: poke              2 store  1 store ;
 
 : part-1            setup 12 2 poke  run  .result ;
 
