@@ -11,5 +11,5 @@ variable #text
 
 ( reload solutuion )
 2variable solution-file-name
-: re                solution-file-name 2@ included ;
+: re   solution-file-name 2@ included ;
 

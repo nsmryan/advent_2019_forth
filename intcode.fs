@@ -69,8 +69,8 @@ here original ! intcode% %allot intcode-init
 
 : restore         original @ swap intcode% nip move ;
 
-: store           cells memory + ! ;
-: load            cells memory + @ ;
+: store           assert( dup #memory < ) assert( dup 0 >= ) cells memory + ! ;
+: load            assert( dup #memory < ) assert( dup 0 >= ) cells memory + @ ;
 
 : ip@             ip @ load ;
 : ip!             ip @ store ;
@@ -83,7 +83,7 @@ here original ! intcode% %allot intcode-init
 : intcode-out     out-ring >>ring ring-pop ;
 
 : .ip             ." ip: " ip @ . ." = " ip@ . cr ;
-: .memory         0 begin dup cells-used @ 32 min < while dup load . 1+ repeat drop ;
+: .memory         0 begin dup cells-used @ 512 min < while dup load . 1+ repeat drop ;
 : .cells-used     ." cells: " cells-used @ . ;
 : .input          ." input:" cr in-ring >>ring .ring ;
 : .output         ." output:" cr out-ring >>ring .ring ;
@@ -122,6 +122,7 @@ variable cursor
 
 ( running )
 : running?        state @ INT_RUNNING = ;
+: running         INT_RUNNING state ! ;
 : need-input      INT_NEED_INPUT state ! ;
 : error-mode      INT_ERROR state ! ;
 
@@ -151,7 +152,7 @@ variable cursor
                   endcase ;
 
 : step            ip@++  decode-instr  instr @ exec  cycles 1+! ;
-: run             begin running? while step repeat ;
+: run             running begin running? while step repeat ;
 
 
 ( intcode assembler )

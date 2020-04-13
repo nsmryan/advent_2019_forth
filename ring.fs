@@ -20,11 +20,8 @@ variable ring
 : ring-write-cell  ring-data ring-write @ cells + ;
 : ring-read-cell   ring-data ring-read @ cells + ;
 
-: .ring            ." ring: " cr
-                   ." read: " ring-read @ . cr
-                   ." write " ring-write @ . cr ;
-
 : ring-incr        1 + ring-depth @ mod ;
+
 : ring-write++     ring-write @ ring-incr ring-write ! ;
 : ring-read++      ring-read @ ring-incr ring-read ! ;
 
@@ -35,7 +32,6 @@ variable ring
                        ring-depth @ 1- ring-read ! ;
 
 : ring-new         dup %ring-allot ring ! ring-init ;
-
 : ring-push?       ring-write @ ring-read @ <> ;
 : assert-ring-push assert( ring-push? ) ;
 : ring-push        assert-ring-push ring-write-cell ! ring-write++ ;
@@ -45,6 +41,12 @@ variable ring
 : ring-pop         assert-ring-pop ring-read++ ring-read-cell @ ;
 
 : ring-clear       ring-depth @ 1- ring-init ;
+
+: .ring-data       ring-read @ begin ring-incr dup ring-write @ <> while dup cells ring-data + @ . repeat drop ;
+: .ring            ." ring: " cr
+                   ." read: " ring-read @ . cr
+                   ." write " ring-write @ . cr 
+                   .ring-data cr ;
 
 : ring-test        3 ring-new
                    assert( ring-depth @ 4 = )
