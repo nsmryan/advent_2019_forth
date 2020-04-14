@@ -9,6 +9,7 @@ include ring.fs
 4 constant #modes
 0 constant POS-MODE
 1 constant IMM-MODE
+2 constant REL-MODE
 
 0 constant INT_RUNNING
 1 constant INT_DONE
@@ -23,9 +24,10 @@ include ring.fs
 6 constant JNEQ-CODE
 7 constant LT-CODE
 8 constant EQ-CODE
+9 constant REL-CODE
 99 constant END-CODE
 
-: memory%       1 #memory cells ;
+: memory%       1 #memory 2cells ;
 : in-ring%      ring% #input long ;
 : out-ring%     ring% #output long ;
 : mode-ring%    ring% #modes long ;
@@ -36,6 +38,7 @@ struct
   cell% field >cells-used
   cell% field >instr
   cell% field >state
+  cell% field >rel-pos
   in-ring% field >in-ring
   out-ring% field >out-ring
   mode-ring% field >mode-ring
@@ -57,6 +60,7 @@ variable intcode
 : cells-used        intcode @ >cells-used ;
 : instr             intcode @ >instr ;
 : state             intcode @ >state ;
+: rel-pos           intcode @ >rel-pos ;
 : in-ring           intcode @ >in-ring ;
 : out-ring          intcode @ >out-ring ;
 : mode-ring         intcode @ >mode-ring ;
@@ -69,21 +73,23 @@ here original ! intcode% %allot intcode-init
 
 : restore         original @ swap intcode% nip move ;
 
-: store           assert( dup #memory < ) assert( dup 0 >= ) cells memory + ! ;
-: load            assert( dup #memory < ) assert( dup 0 >= ) cells memory + @ ;
+: store           assert( over #memory d< ) assert( over 0 >= ) 2cells memory + 2! ;
+: load            assert( dup #memory < ) assert( dup 0 >= ) 2cells memory + 2@ ;
+: rel-store       rel-pos @ + store ;
+: rel-load        rel-pos @ + load ;
 
 : ip@             ip @ load ;
-: ip!             ip @ store ;
-: ip++            ip 1+! ;
+: ip!             ip 2@ store ;
+: ip++            ip 2+! ;
 : ip!++           ip! ip++ ;
 : ip@++           ip@ ip++ ;
-: ip--            ip 1-! ;
+: ip--            ip 2-! ;
 
 : intcode-in      in-ring >>ring ring-push ;
 : intcode-out     out-ring >>ring ring-pop ;
 
 : .ip             ." ip: " ip @ . ." = " ip@ . cr ;
-: .memory         0 begin dup cells-used @ 512 min < while dup load . 1+ repeat drop ;
+: .memory         0 begin dup cells-used @ 512 min < while dup load d. 1+ repeat drop ;
 : .cells-used     ." cells: " cells-used @ . ;
 : .input          ." input:" cr in-ring >>ring .ring ;
 : .output         ." output:" cr out-ring >>ring .ring ;
@@ -97,10 +103,10 @@ variable program
 variable #program
 variable cursor
 
-: store-code      cells-used @ cells memory + !  cells-used 1+! ;
+: store-code      cells-used @ 2cells memory + 2!  cells-used 1+! ;
 : next-code       cursor @ + 1 + cursor ! ;         
-: parse-cell      s>number? drop drop ;
-: read-code       cursor @ over parse-cell swap next-code ;
+: parse-cell      s>number? drop ;
+: read-code       cursor @ over parse-cell rot next-code ;
 : -end            cursor @  program @ #program @ +  >= if 0 rdrop then ;
 : not-comma?      cursor @ + c@ [char] , <> ;
 : code-length     -end 0 begin dup not-comma? while 1 + repeat ;
@@ -112,8 +118,8 @@ variable cursor
 : start-intcode   init-parser  original @ >>intcode  parse-program init-intcode ;
 
 ( instruction decoding )
-: push-mode       mode-ring >>ring ring-push ;
-: pop-mode        mode-ring >>ring ring-pop? if ring-pop else 0 then ;
+: push-mode       mode-ring >>ring 0 ring-push ;
+: pop-mode        mode-ring >>ring ring-pop? if ring-pop drop else 0 then ;
 : split-mode      10 /mod swap ;
 : split-op        100 /mod swap ;
 : init-decode     mode-ring >>ring ring-clear ;
@@ -126,32 +132,48 @@ variable cursor
 : need-input      INT_NEED_INPUT state ! ;
 : error-mode      INT_ERROR state ! ;
 
-: arg             ip@++  pop-mode POS-MODE = if load then ;
-: dst!            ip@++ store ;
-: op-add          arg arg + dst! ;
-: op-mult         arg arg * dst! ;
+: arg             ip@++  pop-mode
+                  case 
+                     IMM-MODE of endof
+                     POS-MODE of load endof
+                     REL-MODE of rel-load endof 
+                     dup ." unexpected mode during load! " . ." at: " .current-cell cr error-mode
+                  endcase ;
+
+: dst!            ip@++ pop-mode 
+                  case
+                      IMM-MODE of ." immediate mode store is invalid!" error-mode endof
+                      POS-MODE of store endof
+                      REL-MODE of rel-store endof
+                      dup ." unexpected mode during store " . ." at: " .current-cell cr error-mode
+                  endcase ;
+
+: op-add          arg arg d+ dst! ;
+: op-mult         arg arg d* dst! ;
 : op-input        in-ring >>ring ring-pop? if ring-pop dst! else ip-- need-input then ;
 : op-output       arg out-ring >>ring ring-push ;
-: op-jeq          arg if arg ip ! else ip++ then ;
-: op-jneq         arg 0 = if arg ip ! else ip++ then ;
-: op-lt           arg arg < if 1 else 0 then dst! ;
-: op-eq           arg arg = if 1 else 0 then dst! ;
+: op-jeq          arg if arg assert( 0= ) ip ! else ip++ then ;
+: op-jneq         arg 0 0 d= if arg assert( 0= ) ip ! else ip++ then ;
+: op-lt           arg arg d< if 1 else 0 then dst! ;
+: op-eq           arg arg d= if 1 else 0 then dst! ;
+: op-rel          arg rel-pos @ + rel-pos ! ;
 : op-end          INT_DONE state ! ;
 
 : exec            case
-                    ADD-CODE  of op-add    endof
-                    MULT-CODE of op-mult   endof
-                    IN-CODE   of op-input  endof
-                    OUT-CODE  of op-output endof
-                    JEQ-CODE  of op-jeq    endof
-                    JNEQ-CODE of op-jneq   endof
-                    LT-CODE   of op-lt     endof
-                    EQ-CODE   of op-eq     endof
-                    END-CODE  of op-end    endof
+                    ADD-CODE   of op-add    endof
+                    MULT-CODE  of op-mult   endof
+                    IN-CODE    of op-input  endof
+                    OUT-CODE   of op-output endof
+                    JEQ-CODE   of op-jeq    endof
+                    JNEQ-CODE  of op-jneq   endof
+                    LT-CODE    of op-lt     endof
+                    EQ-CODE    of op-eq     endof
+                    REL-CODE   of op-rel    endof
+                    END-CODE   of op-end    endof
                     dup ." unexpected opcode! " . ." at: " .current-cell cr error-mode
                   endcase ;
 
-: step            ip@++  decode-instr  instr @ exec  cycles 1+! ;
+: step            ip@++  drop decode-instr  instr @ exec  cycles 1+! ;
 : run             running begin running? while step repeat ;
 
 
