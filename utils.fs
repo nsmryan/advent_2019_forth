@@ -9,6 +9,7 @@
 
 : 2cell     2 cells ;
 : 2cells    2cell * ;
+: 2cell%    2cell 2cell ;
 
 \ a * b =
 \ (a0 + a1) * (b0 + b1) =

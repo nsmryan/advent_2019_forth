@@ -38,7 +38,7 @@ struct
   cell% field >cells-used
   cell% field >instr
   cell% field >state
-  cell% field >rel-pos
+  2cell% field >rel-pos
   in-ring% field >in-ring
   out-ring% field >out-ring
   mode-ring% field >mode-ring
@@ -69,31 +69,33 @@ variable intcode
 : intcode-new       intcode% %allot dup intcode-init >>intcode ;
 
 variable original
-here original ! intcode% %allot intcode-init
+intcode% %allot original !
+original @ intcode-init
 
 : restore         original @ swap intcode% nip move ;
 
-: store           assert( over #memory d< ) assert( over 0 >= ) 2cells memory + 2! ;
+: store           assert( dup #memory < ) assert( dup 0 >= ) 2cells memory + 2! ;
 : load            assert( dup #memory < ) assert( dup 0 >= ) 2cells memory + 2@ ;
-: rel-store       rel-pos @ + store ;
-: rel-load        rel-pos @ + load ;
+: rel-store       rel-pos 2@ d+ store ;
+: rel-load        rel-pos 2@ d+ load ;
 
 : ip@             ip @ load ;
-: ip!             ip 2@ store ;
-: ip++            ip 2+! ;
+: ip!             ip @ store ;
+: ip++            ip 1+! ;
 : ip!++           ip! ip++ ;
 : ip@++           ip@ ip++ ;
-: ip--            ip 2-! ;
+: ip--            ip 1-! ;
 
 : intcode-in      in-ring >>ring ring-push ;
 : intcode-out     out-ring >>ring ring-pop ;
 
-: .ip             ." ip: " ip @ . ." = " ip@ . cr ;
+: .ip             ." ip: " ip @ . ." = " ip@ . ;
+: .rel            ." rel " rel-pos 2@ d. ;
 : .memory         0 begin dup cells-used @ 512 min < while dup load d. 1+ repeat drop ;
 : .cells-used     ." cells: " cells-used @ . ;
 : .input          ." input:" cr in-ring >>ring .ring ;
 : .output         ." output:" cr out-ring >>ring .ring ;
-: .intcode        cr .ip cr .cells-used cr .memory cr .input cr .output ;
+: .intcode        cr .ip cr .rel cr .cells-used cr .memory cr .input cr .output ;
 
 : .current-cell   ip @ . ;
 : .output         out-ring >>ring .ring ;
@@ -156,7 +158,7 @@ variable cursor
 : op-jneq         arg 0 0 d= if arg assert( 0= ) ip ! else ip++ then ;
 : op-lt           arg arg d< if 1 else 0 then dst! ;
 : op-eq           arg arg d= if 1 else 0 then dst! ;
-: op-rel          arg rel-pos @ + rel-pos ! ;
+: op-rel          arg rel-pos 2@ d+ rel-pos 2! ;
 : op-end          INT_DONE state ! ;
 
 : exec            case

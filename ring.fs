@@ -25,11 +25,13 @@ variable ring
 : ring-write++     ring-write @ ring-incr ring-write ! ;
 : ring-read++      ring-read @ ring-incr ring-read ! ;
 
-: %ring-allot      ( depth -- a ) ring% rot 2cells + %allot ;
+: %ring-allot      ( depth -- a ) ring% rot 1+ 2cells + %allot ;
 : ring-init        ( depth -- )
-                   1+ dup 2cells ring% nip + ring @ swap 0 fill 
-                       ring-depth ! 
-                       ring-depth @ 1- ring-read ! ;
+                   dup 1+ ring-depth !  ring-read ! 0 ring-write ! ;
+\ : ring-init        ( depth -- )
+\                    1+ dup 2cells ring% nip + ring @ swap 0 fill 
+\                        ring-depth ! 
+\                        ring-depth @ 1- ring-read ! ;
 
 : ring-new         dup %ring-allot ring ! ring-init ;
 : ring-push?       ring-write @ ring-read @ <> ;
@@ -42,7 +44,7 @@ variable ring
 
 : ring-clear       ring-depth @ 1- ring-init ;
 
-: .ring-data       ring-read @ begin ring-incr dup ring-write @ <> while dup 2cells ring-data d+ 2@ d. repeat drop ;
+: .ring-data       ring-read @ begin ring-incr dup ring-write @ <> while dup 2cells ring-data + 2@ d. repeat drop ;
 : .ring            ." ring: " cr
                    ." read: " ring-read @ . cr
                    ." write " ring-write @ . cr 
