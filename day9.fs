@@ -32,3 +32,4 @@ s" 1102,34915192,34915192,7,4,7,99,0" 2constant input-test2
 ( part 2)
 : part-2            read-input setup-2 2 0 intcode-in run .result ;
 
+
